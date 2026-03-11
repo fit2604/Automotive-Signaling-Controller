@@ -26,11 +26,17 @@ MappingBased on the project's constr.xdc and fsm.vhd, the controls are mapped as
 Input(Switch) Function   Output (LEDs)
 
 sw(0)--> Hazard Lights--> Center LEDs
+
 sw(1)--> Left Signal--> LEDs 15 down to 10
+
 sw(2)--> Right Signal--> LEDs 0 up to 5
+
 sw(3)--> Left Quick Signal--> Full Left Bar
+
 sw(4)--> Right Quick Signal--> Full Right Bar
+
 btn(rst)--> System Reset--> All LEDs OFF
+
 
 CONCLUSION
 
