@@ -1,0 +1,234 @@
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+
+entity fsm is
+    Port (
+        clk  : in  STD_LOGIC;
+        rst  : in  STD_LOGIC;
+        sw   : in  STD_LOGIC_VECTOR(4 downto 0);
+        led  : out STD_LOGIC_VECTOR(15 downto 0)
+    );
+end fsm;
+
+architecture Behavioral of fsm is
+
+    type states is (idle, LAon, LALBon, LALBLCon, RAon, RARBon, RARBRCon, HAZARD1, HAZARD2, HAZARD3, LEFT_UP_SIG, RIGHT_UP_SIG);
+    signal current_state, next_state : states;
+
+    signal sw_hazard, sw_left, sw_right : std_logic;
+    signal sw_left_up, sw_right_up : std_logic;
+    signal inc1sec : std_logic;
+
+begin
+
+    sw_hazard <= sw(0);
+    sw_left   <= sw(1);
+    sw_right  <= sw(2);
+    sw_left_up  <= sw(3);
+    sw_right_up <= sw(4);
+
+    led <= "0000000000000000" when current_state = idle
+
+           else "0000110000110000" when current_state = HAZARD1
+           else "0011110000111100" when current_state = HAZARD2
+           else "1111110000111111" when current_state = HAZARD3
+
+           else "0000110000000000" when current_state = LAon
+           else "0011110000000000" when current_state = LALBon
+           else "1111110000000000" when current_state = LALBLCon
+
+           else "0000000000110000" when current_state = RAon
+           else "0000000000111100" when current_state = RARBon
+           else "0000000000111111" when current_state = RARBRCon
+
+           else "1111110000000000" when current_state = LEFT_UP_SIG
+           else "0000000000111111" when current_state = RIGHT_UP_SIG;
+
+    -- divizor de frecvență pentru simulare (q mic, ca să vezi efectele rapid)
+    process(clk, rst)
+        variable q : integer := 0;
+    begin
+        if rst = '1' then
+            q := 0;
+            inc1sec <= '0';
+        elsif rising_edge(clk) then
+            if q = 10000000 then  -- înlocuiește cu 99999999 pentru implementare reală
+                q := 0;
+                inc1sec <= '1';
+            else
+                q := q + 1;
+                inc1sec <= '0';
+            end if;
+        end if;
+    end process;
+
+    -- registru de stare
+    process(clk, rst)
+    begin
+        if rst = '1' then
+            current_state <= idle;
+        elsif rising_edge(clk) then
+            current_state <= next_state;
+        end if;
+    end process;
+
+    -- FSM sincron
+ process(clk)
+    begin
+        if rising_edge(clk) then
+            case current_state is
+    when idle =>
+        if sw_left = '1' then
+            next_state <= LAon;
+        elsif sw_right = '1' then
+            next_state <= RAon;
+        elsif sw_hazard = '1' then
+            next_state <= HAZARD1;
+        elsif sw_left_up = '1' then
+            next_state <= LEFT_UP_SIG;
+        elsif sw_right_up = '1' then
+            next_state <= RIGHT_UP_SIG;
+        else
+            next_state <= idle;
+        end if;
+
+    -- semnalizare stânga sus
+    when LEFT_UP_SIG =>
+        if sw_left_up = '0' then
+            next_state <= idle;
+        else
+            next_state <= LEFT_UP_SIG;
+        end if;
+
+    -- semnalizare dreapta sus
+    when RIGHT_UP_SIG =>
+        if sw_right_up = '0' then
+            next_state <= idle;
+        else
+            next_state <= RIGHT_UP_SIG;
+        end if;
+
+                when LAon =>
+                    if sw_left = '1' and inc1sec = '1' then
+                        next_state <= LALBon;
+                    elsif sw_right = '1' then
+                        next_state <= RAon;
+                    elsif sw_hazard = '1' then
+                        next_state <= HAZARD1;
+                    elsif sw_left = '0' and sw_right = '0' and sw_hazard = '0' then
+                        next_state <= idle;
+                    else
+                        next_state <= LAon;
+                    end if;
+
+                when LALBon =>
+                    if sw_left = '1' and inc1sec = '1' then
+                        next_state <= LALBLCon;
+                    elsif sw_right = '1' then
+                        next_state <= RAon;
+                    elsif sw_hazard = '1' then
+                        next_state <= HAZARD1;
+                    elsif sw_left = '0' and sw_right = '0' and sw_hazard = '0' and inc1sec = '1' then
+                        next_state <= idle;
+                    else
+                        next_state <= LALBon;
+                    end if;
+
+                when LALBLCon =>
+                    if sw_left = '1' and inc1sec = '1' then
+                        next_state <= idle;
+                    elsif sw_right = '1' then
+                        next_state <= RAon;
+                    elsif sw_hazard = '1' then
+                        next_state <= HAZARD1;
+                    elsif sw_left = '0' and sw_right = '0' and sw_hazard = '0' then
+                        next_state <= idle;
+                    else
+                        next_state <= LALBLCon;
+                    end if;
+
+                when RAon =>
+                    if sw_right = '1' and inc1sec = '1' then
+                        next_state <= RARBon;
+                    elsif sw_left = '1' then
+                        next_state <= LAon;
+                    elsif sw_hazard = '1' then
+                        next_state <= HAZARD1;
+                    elsif sw_left = '0' and sw_right = '0' and sw_hazard = '0' then
+                        next_state <= idle;
+                    else
+                        next_state <= RAon;
+                    end if;
+
+                when RARBon =>
+                    if sw_right = '1' and inc1sec = '1' then
+                        next_state <= RARBRCon;
+                    elsif sw_left = '1' then
+                        next_state <= LAon;
+                    elsif sw_hazard = '1' then
+                        next_state <= HAZARD1;
+                    elsif sw_left = '0' and sw_right = '0' and sw_hazard = '0' then
+                        next_state <= idle;
+                    else
+                        next_state <= RARBon;
+                    end if;
+
+                when RARBRCon =>
+                    if sw_right = '1' and inc1sec = '1' then
+                        next_state <= idle;
+                    elsif sw_left = '1' then
+                        next_state <= LAon;
+                    elsif sw_hazard = '1' then
+                        next_state <= HAZARD1;
+                    elsif sw_left = '0' and sw_right = '0' and sw_hazard = '0' then
+                        next_state <= idle;
+                    else
+                        next_state <= RARBRCon;
+                    end if;
+
+                when HAZARD1 =>
+                    if sw_hazard = '1' and inc1sec = '1' then
+                        next_state <= HAZARD2;
+                    elsif sw_left = '1' then
+                        next_state <= LAon;
+                    elsif sw_right = '1' then
+                        next_state <= RAon;
+                    elsif sw_left = '0' and sw_right = '0' and sw_hazard = '0' then
+                        next_state <= idle;
+                    else
+                        next_state <= HAZARD1;
+                    end if;
+
+                when HAZARD2 =>
+                    if sw_hazard = '1' and inc1sec = '1' then
+                        next_state <= HAZARD3;
+                    elsif sw_left = '1' then
+                        next_state <= LAon;
+                    elsif sw_right = '1' then
+                        next_state <= RAon;
+                    elsif sw_left = '0' and sw_right = '0' and sw_hazard = '0' then
+                        next_state <= idle;
+                    else
+                        next_state <= HAZARD2;
+                    end if;
+
+                when HAZARD3 =>
+                    if sw_hazard = '1' and inc1sec = '1' then
+                        next_state <= idle;
+                    elsif sw_left = '1' then
+                        next_state <= LAon;
+                    elsif sw_right = '1' then
+                        next_state <= RAon;
+                    elsif sw_left = '0' and sw_right = '0' and sw_hazard = '0' then
+                        next_state <= idle;
+                    else
+                        next_state <= HAZARD3;
+                    end if;
+
+                when others =>
+                    next_state <= idle;
+            end case;
+        end if;
+    end process;
+
+end Behavioral;
